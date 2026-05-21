@@ -10,6 +10,7 @@
     },
     "external_directory": {
       "*": "ask",
+      "~/.cache/*": "allow",
       "/mnt/*": "allow",
       "/tmp": "allow",
       "/tmp/*": "allow",
