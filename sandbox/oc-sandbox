@@ -231,8 +231,8 @@ _read_config_value() {
 _expand_home() {
   local path="$1"
   case "$path" in
-  '~/') path="${HOME}/${path#'~'/}" ;;
-  '~') path="$HOME" ;;
+  '~/'*) path="${HOME}/${path#'~'/}" ;;
+  '~'*) path="$HOME" ;;
   esac
   case "$path" in
   \$HOME/*)
