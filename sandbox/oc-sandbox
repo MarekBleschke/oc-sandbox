@@ -67,6 +67,14 @@ Options:
     --debug                      Run /bin/bash instead of opencode for debugging
     -h, --help                   Show this help message
 
+Project configuration:
+    Place a .oc-sandbox file in the workspace root directory to set
+    per-project defaults:
+      [general]
+      default_image = python
+      default_profile = superpowers:eco
+    Project config values override the global config; CLI flags override both.
+
 Arguments:
     PATH   Directory to mount as /workspace (default: current working directory)
 
@@ -527,10 +535,6 @@ cmd_run() {
 
   workspace_path="$(cd "$workspace_path" && pwd)"
 
-  if [ ! -d "$workspace_path" ]; then
-    error "PATH is not a directory: $workspace_path"
-  fi
-
   # --- Layered config resolution ---
   # Precedence (lowest to highest):
   # 1. Compiled defaults (already set above)
@@ -543,9 +547,11 @@ cmd_run() {
   local configured_value
 
   # Layer 2: Global config
-  configured_value="$(_read_config_value "$config_file" "general" "default_image")"
-  if [ -n "$configured_value" ]; then
-    image_name="$configured_value"
+  if [ -f "$config_file" ]; then
+    configured_value="$(_read_config_value "$config_file" "general" "default_image")"
+    if [ -n "$configured_value" ]; then
+      image_name="$configured_value"
+    fi
   fi
 
   # Layer 3: Project config (.oc-sandbox)
@@ -586,7 +592,7 @@ cmd_run() {
     if [ "$profile_variant" = "$profile" ]; then
       profile_variant=""
     else
-      profile="${profile%%:*}"
+      profile="${profile%%:*}"  # Strip variant suffix; downstream code uses $profile as just the name
     fi
   fi
 
