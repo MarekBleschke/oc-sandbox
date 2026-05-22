@@ -6,11 +6,13 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
 1. **Install** oc-sandbox:
 
+   Remote install (no git required):
    ```bash
-   # Remote install (no git required):
    curl -fsSL https://raw.githubusercontent.com/MarekBleschke/oc-sandbox/main/install.sh | bash
+   ```
 
-   # Or install from a cloned repo:
+   Install from a cloned repo:
+   ```bash
    git clone git@github.com:MarekBleschke/oc-sandbox.git && cd oc-sandbox
    ./install.sh
    ```
