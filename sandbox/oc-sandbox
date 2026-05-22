@@ -67,6 +67,14 @@ Options:
     --debug                      Run /bin/bash instead of opencode for debugging
     -h, --help                   Show this help message
 
+Project configuration:
+    Place a .oc-sandbox file in the workspace root directory to set
+    per-project defaults:
+      [general]
+      default_image = python
+      default_profile = superpowers:eco
+    Project config values override the global config; CLI flags override both.
+
 Arguments:
     PATH   Directory to mount as /workspace (default: current working directory)
 
@@ -231,8 +239,8 @@ _read_config_value() {
 _expand_home() {
   local path="$1"
   case "$path" in
-  '~/') path="${HOME}/${path#'~'/}" ;;
-  '~') path="$HOME" ;;
+  '~/'*) path="${HOME}/${path#'~'/}" ;;
+  '~'*) path="$HOME" ;;
   esac
   case "$path" in
   \$HOME/*)
@@ -446,13 +454,9 @@ cmd_run() {
   local no_gh_token="false"
   local gh_token=""
 
-  # Read default_image from config if available
-  local config_file="${CONFIG_DIR}/config"
-  local configured_image
-  configured_image="$(_read_config_value "$config_file" "general" "default_image")"
-  if [ -n "$configured_image" ]; then
-    image_name="$configured_image"
-  fi
+  # Track CLI-provided values separately for layered config precedence
+  local cli_image=""
+  local cli_profile=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -460,14 +464,14 @@ cmd_run() {
       if [ -z "${2:-}" ]; then
         error "Option --image requires a value."
       fi
-      image_name="$2"
+      cli_image="$2"
       shift 2
       ;;
     -p | --profile)
       if [ -z "${2:-}" ]; then
         error "Option --profile requires a value."
       fi
-      profile="$2"
+      cli_profile="$2"
       shift 2
       ;;
     -h | --help)
@@ -515,13 +519,80 @@ cmd_run() {
     error "Cannot use --gh-token with --no-gh-token"
   fi
 
-  # Parse profile:variant syntax
+  # Default workspace path to current directory
+  if [ -z "$workspace_path" ]; then
+    workspace_path="$(pwd)"
+  fi
+
+  # Resolve to absolute path and validate existence
+  if [ ! -e "$workspace_path" ]; then
+    error "PATH does not exist: $workspace_path"
+  fi
+
+  if [ ! -d "$workspace_path" ]; then
+    error "PATH is not a directory: $workspace_path"
+  fi
+
+  workspace_path="$(cd "$workspace_path" && pwd)"
+
+  # --- Layered config resolution ---
+  # Precedence (lowest to highest):
+  # 1. Compiled defaults (already set above)
+  # 2. Global config: ~/.config/oc-sandbox/config
+  # 3. Project config: ${workspace_path}/.oc-sandbox
+  # 4. CLI flags (--image and --profile)
+
+  local config_file="${CONFIG_DIR}/config"
+  local project_config_file="${workspace_path}/.oc-sandbox"
+  local configured_value
+
+  # Layer 2: Global config
+  if [ -f "$config_file" ]; then
+    configured_value="$(_read_config_value "$config_file" "general" "default_image")"
+    if [ -n "$configured_value" ]; then
+      image_name="$configured_value"
+    fi
+  fi
+
+  # Layer 3: Project config (.oc-sandbox)
+  if [ -f "$project_config_file" ]; then
+    configured_value="$(_read_config_value "$project_config_file" "general" "default_image")"
+    if [ -n "$configured_value" ]; then
+      image_name="$configured_value"
+    fi
+  fi
+
+  # Layer 4: CLI --image flag
+  if [ -n "$cli_image" ]; then
+    image_name="$cli_image"
+  fi
+
+  # Profile resolution (same layered approach)
+  # Layer 2: Global config
+  if [ -f "$config_file" ]; then
+    profile="$(_read_config_value "$config_file" "general" "default_profile")"
+  fi
+
+  # Layer 3: Project config (.oc-sandbox)
+  if [ -f "$project_config_file" ]; then
+    configured_value="$(_read_config_value "$project_config_file" "general" "default_profile")"
+    if [ -n "$configured_value" ]; then
+      profile="$configured_value"
+    fi
+  fi
+
+  # Layer 4: CLI --profile flag
+  if [ -n "$cli_profile" ]; then
+    profile="$cli_profile"
+  fi
+
+  # Parse profile:variant syntax from final profile value
   if [ -n "$profile" ]; then
     profile_variant="${profile#*:}"
     if [ "$profile_variant" = "$profile" ]; then
       profile_variant=""
     else
-      profile="${profile%%:*}"
+      profile="${profile%%:*}"  # Strip variant suffix; downstream code uses $profile as just the name
     fi
   fi
 
@@ -532,20 +603,13 @@ cmd_run() {
     fi
   fi
 
-  local config_file="${CONFIG_DIR}/config"
-
-  # If no profile from --profile flag, try config default
+  # Error if no profile resolved
   if [ -z "$profile" ]; then
-    if [ -f "$config_file" ]; then
-      profile="$(_read_config_value "$config_file" "general" "default_profile")"
-    fi
-    if [ -z "$profile" ]; then
-      error "No default profile configured and --profile not specified.
+    error "No default profile configured and --profile not specified.
 Set a default profile in ${config_file:-~/.config/oc-sandbox/config}:
   [general]
   default_profile = superpowers
 Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
-    fi
   fi
 
   check_podman
@@ -582,26 +646,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     if [ ! -f "$variant_file" ]; then
       error "Variant '${profile_variant}' not found for profile '${profile}'"
     fi
-  fi
-
-  # Default workspace path to current directory
-  if [ -z "$workspace_path" ]; then
-    workspace_path="$(pwd)"
-  fi
-
-  # Resolve to absolute path and validate existence
-  if [ ! -e "$workspace_path" ]; then
-    error "PATH does not exist: $workspace_path"
-  fi
-
-  if [ ! -d "$workspace_path" ]; then
-    error "PATH is not a directory: $workspace_path"
-  fi
-
-  workspace_path="$(cd "$workspace_path" && pwd)"
-
-  if [ ! -d "$workspace_path" ]; then
-    error "PATH is not a directory: $workspace_path"
   fi
 
   # Warn if path is outside home directory

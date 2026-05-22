@@ -28,22 +28,16 @@ Usage: install.sh [OPTIONS]
 Install oc-sandbox to ~/.local/bin/ with XDG-standard data and config directories.
 
 Options:
-    --dev               Development mode: symlink files from local repository
     --no-completions    Skip shell completion setup
     -h, --help          Show this help message
 EOF
 }
 
 main() {
-  local dev_mode="false"
   local no_completions="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    --dev)
-      dev_mode="true"
-      shift
-      ;;
     --no-completions)
       no_completions="true"
       shift
@@ -75,10 +69,6 @@ main() {
     repo_dir="$script_dir"
   fi
 
-  if [ "$dev_mode" = "true" ] && [ "$is_local" = "false" ]; then
-    error "--dev requires running from a local repository"
-  fi
-
   local temp_dir=""
   if [ "$is_local" = "false" ]; then
     temp_dir="$(mktemp -d)"
@@ -97,31 +87,21 @@ main() {
   mkdir -p "$data_dir"
   mkdir -p "$config_dir"
 
-  if [ "$dev_mode" = "true" ]; then
-    ln -sf "${repo_dir}/sandbox/oc-sandbox" "$install_path"
-    info "Symlinked ${install_path} → ${repo_dir}/sandbox/oc-sandbox"
-  else
-    cp "${repo_dir}/sandbox/oc-sandbox" "$install_path"
-    chmod +x "$install_path"
-    info "Installed ${install_path}"
-  fi
+  cp "${repo_dir}/sandbox/oc-sandbox" "$install_path"
+  chmod +x "$install_path"
+  info "Installed ${install_path}"
 
   local data_items=("containerfiles" "init.sh" "opencode-install.sha256" "completion_zsh")
   for item in "${data_items[@]}"; do
     local src="${repo_dir}/sandbox/${item}"
     local dst="${data_dir}/${item}"
-    if [ "$dev_mode" = "true" ]; then
-      ln -sf "$src" "$dst"
-      info "Symlinked ${dst} → ${src}"
+    if [ -d "$src" ]; then
+      rm -rf "$dst" 2>/dev/null || true
+      cp -R "$src" "$dst"
     else
-      if [ -d "$src" ]; then
-        rm -rf "$dst" 2>/dev/null || true
-        cp -R "$src" "$dst"
-      else
-        cp "$src" "$dst"
-      fi
-      info "Copied ${dst}"
+      cp "$src" "$dst"
     fi
+    info "Copied ${dst}"
   done
 
   local config_file="${config_dir}/config"
@@ -185,14 +165,9 @@ MOUNTS_EOF
       local abs_path
       abs_path="$(cd "$profile_dir" && pwd)"
       local target_path="${profiles_target}/${name}"
-      if [ "$dev_mode" = "true" ]; then
-        ln -sf "$abs_path" "$target_path"
-        info "Symlinked profile: $name"
-      else
-        rm -rf "$target_path" 2>/dev/null || true
-        cp -R "$abs_path" "$target_path"
-        info "Installed profile: $name"
-      fi
+      rm -rf "$target_path" 2>/dev/null || true
+      cp -R "$abs_path" "$target_path"
+      info "Installed profile: $name"
     done
   fi
 

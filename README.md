@@ -10,12 +10,9 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
    # Remote install (no git required):
    curl -fsSL https://raw.githubusercontent.com/MarekBleschke/oc-sandbox/main/install.sh | bash
 
-   # Or install from a cloned repo (normal mode):
+   # Or install from a cloned repo:
    git clone git@github.com:MarekBleschke/oc-sandbox.git && cd oc-sandbox
    ./install.sh
-
-   # Or install in dev mode (symlinks to source for live editing):
-   ./install.sh --dev
    ```
 
 2. **Build** the container image (required before first run or after config changes):
@@ -41,11 +38,13 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
    | Flag | Default | Description |
    |------|---------|-------------|
-   | `-p, --profile <name>` | `superpowers` | Opencode profile to activate |
-   | `-t, --tag <tag>` | `main` | Image tag to run |
+   | `-I, --image <NAME>` | `base` | Image to use |
+   | `-p, --profile <NAME[:VARIANT]>` | `(from config)` | Opencode profile to activate |
    | `--debug` | — | Drop into `/bin/bash` instead of opencode |
    | `--no-ssh` | — | Skip mounting SSH keys from host |
    | `--no-auth` | — | Skip mounting auth.json from host |
+   | `--no-gh-token` | — | Skip GH_TOKEN detection from host |
+   | `--gh-token <TOKEN>` | — | Use the provided GitHub token |
 
 ## Configuration
 
@@ -66,6 +65,27 @@ auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencod
 ```
 
 The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expansion. If a mount key is missing or malformed, the CLI falls back to the default paths. Use `--no-ssh` or `--no-auth` to skip mounts regardless of config.
+
+### Per-Project Configuration
+
+Place a `.oc-sandbox` file in your project's root directory to override global defaults:
+
+```ini
+[general]
+# Override the image used by `oc-sandbox run` for this project
+default_image = python
+# Override the profile used by `oc-sandbox run` for this project
+default_profile = superpowers:eco
+```
+
+Precedence (lowest to highest):
+1. **Compiled defaults:** `image=base`, `profile=<empty>`
+2. **Global config:** `~/.config/oc-sandbox/config`
+3. **Project config:** `.oc-sandbox` in the workspace directory
+4. **CLI flags:** `--image` and `--profile` always win
+
+The `.oc-sandbox` file can be checked into version control so all
+contributors share the same sandbox configuration.
 
 ## Project structure
 
