@@ -100,6 +100,10 @@ The `sandbox/bootstrap.sh` script has been removed. Build-time customization is 
 
 - **`OPENCODE_INSTALL_SHA256`** — SHA256 checksum for the opencode install script (passed via `sandbox/opencode-install.sha256`)
 
+### Containerfile PATH Convention
+
+Containerfiles installing tools to non-standard locations (not via `apt-get` into `/usr/bin`) must use `ENV PATH` to extend the runtime PATH. Never rely on `.bashrc` or `.profile` — those are only sourced by interactive shells and will not apply when the container runs `opencode` directly.
+
 All other configuration (git identity, model mappings, profile data) is handled at runtime:
 - Git identity: read from mounted config file by `init.sh`
 - Model mappings: read from `profile.conf` by `init.sh`
