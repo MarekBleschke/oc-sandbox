@@ -150,7 +150,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   fi
 done <"$CONF_FILE"
 
-log_debug "Parsed ${#MODELS[@]} model(s) from profile config"
+set +u; log_debug "Parsed ${#MODELS[@]} model(s) from profile config"; set -u
 
 # --- Create resolved output directory ---
 RESOLVED_DIR="$HOME/.cache/oc-sandbox/resolved"
